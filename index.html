@@ -36,16 +36,16 @@
     <!-- WebLLM Library Import -->
     <script type="module">
         // Import the necessary function from the WebLLM library.
-        // Updated to version 0.2.79 to resolve 404 issues with previous versions.
-        import { CreateMLCEngine } from "https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.79/dist/webllm.js";
+        // Using version 0.2.37 for better CDN file availability for core library files.
+        import { CreateMLCEngine } from "https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.37/dist/webllm.js";
 
         // Global variables to hold the WebLLM engine instance, chat history, and generation state.
         let engine;
         let chatHistory = [];
         let isGenerating = false;
 
-        // Define the model to use. Qwen2.5-0.5B-Instruct-q4f16_1-MLC is a small, well-supported model for quick testing.
-        const MODEL_ID = "Qwen2.5-0.5B-Instruct-q4f16_1-MLC";
+        // Define the model to use. Switched to a very small model for increased loading reliability.
+        const MODEL_ID = "SmolLM2-360M-Instruct-q4f16_1-MLC"; // One of the smallest models
 
         /**
          * Initializes the WebLLM engine. This function handles loading the WebLLM library
@@ -69,7 +69,7 @@
                 // Ensure the worker URL also uses the updated version.
                 console.log("WebLLM: Creating MLC Engine instance...");
                 engine = await CreateMLCEngine(
-                    new Worker("https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.79/dist/webllm.worker.js", { type: "module" }),
+                    new Worker("https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.37/dist/webllm.worker.js", { type: "module" }),
                     {
                         // Callback to report loading progress to the user.
                         initProgressCallback: (report) => {
