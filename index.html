@@ -44,6 +44,9 @@
         let chatHistory = [];
         let isGenerating = false;
 
+        // Define the model to use. Changed to a smaller, known-good model for better compatibility.
+        const MODEL_ID = "Qwen2.5-0.5B-Instruct-q4f16_1-MLC";
+
         /**
          * Initializes the WebLLM engine. This function handles loading the WebLLM library
          * and the chosen AI model. It provides feedback to the user during the loading process.
@@ -54,7 +57,7 @@
             const loadingIndicator = document.getElementById('loadingIndicator');
 
             // Display initial loading message and disable the generate button.
-            outputDiv.innerHTML = '<p class="text-gray-600">Initializing WebLLM... This may take a moment to download the model (hundreds of MBs).</p>';
+            outputDiv.innerHTML = `<p class="text-gray-600">Initializing WebLLM with model ${MODEL_ID}... This may take a moment to download the model (hundreds of MBs).</p>`;
             loadingIndicator.classList.remove('hidden');
             generateBtn.disabled = true;
 
@@ -84,19 +87,17 @@
                     }
                 );
 
-                console.log("WebLLM: Engine created. Attempting to reload/load model 'Phi-3-mini-4k-instruct-q4f16_1-MLC'...");
+                console.log(`WebLLM: Engine created. Attempting to reload/load model '${MODEL_ID}'...`);
                 outputDiv.innerHTML = '<p class="text-gray-600">Downloading model files and compiling WebAssembly... This is the largest part. Please be patient.</p>';
 
-                // Reload/load a specific model.
-                // "Phi-3-mini-4k-instruct-q4f16_1-MLC" is chosen for its balance of size and capability.
-                // It's relatively small compared to larger models, leading to faster downloads.
-                await engine.reload("Phi-3-mini-4k-instruct-q4f16_1-MLC");
+                // Reload/load the specified model.
+                await engine.reload(MODEL_ID);
 
                 // Final update to UI once the model is fully loaded and ready.
                 outputDiv.innerHTML = `<p class="text-green-600">WebLLM Ready! Enter your prompt and generate.</p>`;
                 generateBtn.disabled = false;
                 loadingIndicator.classList.add('hidden');
-                console.log("WebLLM: Model 'Phi-3-mini-4k-instruct-q4f16_1-MLC' successfully loaded and ready.");
+                console.log(`WebLLM: Model '${MODEL_ID}' successfully loaded and ready.`);
 
             } catch (error) {
                 // Log and display any errors during WebLLM initialization.
@@ -236,7 +237,7 @@
         </div>
 
         <!-- Right Box: Generated Output Display -->
-        <div class="flex-1 p-6 flex flex-col bg-gray-50">
+        <div id="output-box" class="flex-1 p-6 flex flex-col bg-gray-50">
             <h2 class="text-2xl font-bold text-gray-800 mb-4">Generated Document</h2>
             <div id="output" class="flex-1 p-4 bg-white border border-gray-300 rounded-lg overflow-y-auto text-gray-800 leading-relaxed text-sm shadow-inner">
                 <p class="text-gray-600">WebLLM is initializing... Please wait for the model to load.</p>
