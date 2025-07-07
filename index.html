@@ -1,121 +1,247 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>LegalDoc AI (WebLLM)</title>
-  <style>
-    body {
-      font-family: 'Inter', sans-serif;
-      background-color: #f6f4f0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 40px;
-    }
-    h1 {
-      color: #2e5d34;
-      margin-bottom: 20px;
-    }
-    .container {
-      display: flex;
-      gap: 20px;
-      width: 100%;
-      max-width: 1000px;
-    }
-    .box {
-      background-color: #ffffff;
-      border-radius: 12px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-      flex: 1;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-    }
-    textarea {
-      width: 100%;
-      height: 200px;
-      padding: 10px;
-      border-radius: 8px;
-      border: 1px solid #ccc;
-      resize: vertical;
-      font-size: 14px;
-    }
-    select, button {
-      margin-top: 10px;
-      padding: 10px;
-      border-radius: 6px;
-      border: 1px solid #aaa;
-      background: #e4efe7;
-      font-weight: bold;
-      cursor: pointer;
-      font-size: 14px;
-    }
-    #output {
-      white-space: pre-wrap;
-      font-family: monospace;
-      color: #333;
-      margin-top: 10px;
-      flex: 1;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LawyerPrompt</title>
+    <!-- Tailwind CSS CDN for modern styling and responsiveness -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles to ensure Inter font is used and layout takes full height */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Ensure the main container takes full height of the viewport */
+        html, body, #app {
+            height: 100%;
+            margin: 0;
+            overflow: hidden; /* Prevent body scrolling if content fits */
+        }
+        /* Custom scrollbar for output div */
+        #output::-webkit-scrollbar {
+            width: 8px;
+        }
+        #output::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        #output::-webkit-scrollbar-thumb {
+            background: #cbd5e1; /* Tailwind gray-300 */
+            border-radius: 10px;
+        }
+        #output::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; /* Tailwind gray-400 */
+        }
+    </style>
+    <!-- WebLLM Library Import -->
+    <script type="module">
+        // Import the necessary function from the WebLLM library.
+        // Using a specific version (0.2.43) for stability.
+        import { CreateMLCEngine } from "https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.43/dist/webllm.js";
+
+        // Global variables to hold the WebLLM engine instance, chat history, and generation state.
+        let engine;
+        let chatHistory = [];
+        let isGenerating = false;
+
+        /**
+         * Initializes the WebLLM engine. This function handles loading the WebLLM library
+         * and the chosen AI model. It provides feedback to the user during the loading process.
+         */
+        async function initializeWebLLM() {
+            const outputDiv = document.getElementById('output');
+            const generateBtn = document.getElementById('generateBtn');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+
+            // Display initial loading message and disable the generate button.
+            outputDiv.innerHTML = '<p class="text-gray-600">Initializing WebLLM... This may take a moment to download the model (hundreds of MBs).</p>';
+            loadingIndicator.classList.remove('hidden');
+            generateBtn.disabled = true;
+
+            console.log("WebLLM: Starting initialization process...");
+
+            try {
+                // Create the WebLLM engine instance.
+                // It uses a Web Worker to run the model in a separate thread, preventing UI freezes.
+                console.log("WebLLM: Creating MLC Engine instance...");
+                engine = await CreateMLCEngine(
+                    new Worker("https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.43/dist/webllm.worker.js", { type: "module" }),
+                    {
+                        // Callback to report loading progress to the user.
+                        initProgressCallback: (report) => {
+                            const percentage = (report.progress * 100).toFixed(0);
+                            outputDiv.innerHTML = `<p class="text-gray-600">Loading model: ${report.text} (${percentage}%)</p>`;
+                            console.log(`WebLLM Progress: ${report.text} (${percentage}%)`);
+
+                            // Once loading is complete (progress === 1), update UI.
+                            if (report.progress === 1) {
+                                outputDiv.innerHTML = `<p class="text-green-600">WebLLM Ready! Enter your prompt and generate.</p>`;
+                                generateBtn.disabled = false;
+                                loadingIndicator.classList.add('hidden');
+                                console.log("WebLLM: Model initialization complete.");
+                            }
+                        }
+                    }
+                );
+
+                console.log("WebLLM: Engine created. Attempting to reload/load model 'Phi-3-mini-4k-instruct-q4f16_1-MLC'...");
+                outputDiv.innerHTML = '<p class="text-gray-600">Downloading model files and compiling WebAssembly... This is the largest part. Please be patient.</p>';
+
+                // Reload/load a specific model.
+                // "Phi-3-mini-4k-instruct-q4f16_1-MLC" is chosen for its balance of size and capability.
+                // It's relatively small compared to larger models, leading to faster downloads.
+                await engine.reload("Phi-3-mini-4k-instruct-q4f16_1-MLC");
+
+                // Final update to UI once the model is fully loaded and ready.
+                outputDiv.innerHTML = `<p class="text-green-600">WebLLM Ready! Enter your prompt and generate.</p>`;
+                generateBtn.disabled = false;
+                loadingIndicator.classList.add('hidden');
+                console.log("WebLLM: Model 'Phi-3-mini-4k-instruct-q4f16_1-MLC' successfully loaded and ready.");
+
+            } catch (error) {
+                // Log and display any errors during WebLLM initialization.
+                console.error("WebLLM Error: Failed to initialize WebLLM or load model:", error);
+                outputDiv.innerHTML = `<p class="text-red-600">Error initializing WebLLM: ${error.message}. Please check console for details.</p>`;
+                loadingIndicator.classList.add('hidden');
+            }
+        }
+
+        /**
+         * Generates a legal document based on user input and selected document type.
+         * This function interacts with the initialized WebLLM engine.
+         */
+        async function generateDocument() {
+            // Prevent multiple generations if one is already in progress.
+            if (isGenerating) return;
+
+            const promptInput = document.getElementById('promptInput').value;
+            const docType = document.getElementById('docType').value;
+            const outputDiv = document.getElementById('output');
+            const generateBtn = document.getElementById('generateBtn');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+
+            // Input validation
+            if (!promptInput.trim()) {
+                outputDiv.innerHTML = '<p class="text-red-500">Please enter a prompt.</p>';
+                return;
+            }
+            if (!engine) {
+                outputDiv.innerHTML = '<p class="text-red-500">WebLLM is not initialized yet. Please wait for it to load.</p>';
+                console.warn("Attempted to generate document before WebLLM engine was ready.");
+                return;
+            }
+
+            // Set generation state, disable button, and show loading indicator.
+            isGenerating = true;
+            generateBtn.disabled = true;
+            loadingIndicator.classList.remove('hidden');
+            outputDiv.innerHTML = '<p class="text-blue-500">Generating document...</p>';
+            console.log("WebLLM: Starting document generation.");
+            console.log("WebLLM: Prompt:", promptInput);
+            console.log("WebLLM: Document Type:", docType);
+
+
+            // Construct the full prompt for the LLM.
+            // This prompt instructs the model to act as a legal document generator.
+            const fullPrompt = `You are a legal document generator. Based on the following request, generate a ${docType} document.
+
+            User Prompt: "${promptInput}"
+
+            Generate the ${docType} document, ensuring it follows standard legal formatting and includes all necessary sections. Be concise and professional.`;
+
+            // Clear previous chat history and add the new user prompt.
+            chatHistory = [{ role: "user", content: fullPrompt }];
+            let generatedText = "";
+
+            try {
+                // Call the WebLLM engine to generate completions.
+                // `stream: true` allows for real-time display of generated text.
+                console.log("WebLLM: Calling chat.completions.create...");
+                const chunks = await engine.chat.completions.create({
+                    messages: chatHistory,
+                    stream: true,
+                });
+
+                // Iterate over the streamed chunks and append to the output.
+                for await (const chunk of chunks) {
+                    generatedText += chunk.choices[0].delta.content || "";
+                    // Use <pre> and whitespace-pre-wrap for preserving formatting like newlines.
+                    outputDiv.innerHTML = `<pre class="whitespace-pre-wrap">${generatedText}</pre>`;
+                    // Scroll to the bottom of the output div to show latest text.
+                    outputDiv.scrollTop = outputDiv.scrollHeight;
+                }
+                // Add the assistant's response to chat history for potential future turns (though not used in this simple app).
+                chatHistory.push({ role: "assistant", content: generatedText });
+                console.log("WebLLM: Document generation complete.");
+
+            } catch (error) {
+                // Handle and display errors during the generation process.
+                console.error("WebLLM Error: Error during document generation:", error);
+                outputDiv.innerHTML = `<p class="text-red-600">Error generating document: ${error.message}</p>`;
+            } finally {
+                // Reset generation state, enable button, and hide loading indicator.
+                isGenerating = false;
+                generateBtn.disabled = false;
+                loadingIndicator.classList.add('hidden');
+            }
+        }
+
+        // Event listener to initialize WebLLM when the entire window has loaded.
+        window.onload = initializeWebLLM;
+
+        // Event listener to attach the generateDocument function to the button click.
+        // DOMContentLoaded ensures the button element exists before trying to add the listener.
+        document.addEventListener('DOMContentLoaded', () => {
+            const generateBtn = document.getElementById('generateBtn');
+            if (generateBtn) {
+                generateBtn.addEventListener('click', generateDocument);
+            }
+        });
+    </script>
 </head>
-<body>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+    <!-- Main application container -->
+    <div id="app" class="flex flex-col md:flex-row w-full max-w-6xl h-[90vh] bg-white rounded-xl shadow-lg overflow-hidden">
+        <!-- Left Box: User Input and Controls -->
+        <div class="flex-1 p-6 flex flex-col border-b md:border-b-0 md:border-r border-gray-200">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">LawyerPrompt</h2>
 
-<h1>LegalDoc AI (Runs in Browser!)</h1>
+            <!-- Prompt Input Area -->
+            <div class="mb-4">
+                <label for="promptInput" class="block text-gray-700 text-sm font-semibold mb-2">Your Prompt:</label>
+                <textarea id="promptInput" rows="8" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 resize-y" placeholder="e.g., Draft a patent claim for a new type of self-cleaning cat litter box that uses ultrasonic vibrations."></textarea>
+            </div>
 
-<div class="container">
-  <div class="box">
-    <label for="type">Document Type:</label>
-    <select id="type">
-      <option>Patent</option>
-      <option>Cease and Desist</option>
-      <option>Lawsuit Claim</option>
-      <option>Terms of Service</option>
-    </select>
+            <!-- Document Type Selection Dropdown -->
+            <div class="mb-6">
+                <label for="docType" class="block text-gray-700 text-sm font-semibold mb-2">Select Document Type:</label>
+                <select id="docType" class="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-blue-500 focus:border-blue-500">
+                    <option value="patent claim">Patent Claim</option>
+                    <option value="legal brief">Legal Brief</option>
+                    <option value="contract clause">Contract Clause</option>
+                    <option value="cease and desist letter">Cease and Desist Letter</option>
+                    <option value="privacy policy section">Privacy Policy Section</option>
+                    <option value="terms of service section">Terms of Service Section</option>
+                    <option value="affidavit">Affidavit</option>
+                    <option value="will clause">Will Clause</option>
+                </select>
+            </div>
 
-    <textarea id="input" placeholder="Describe what you want the document to include..."></textarea>
-    <button id="generate">Generate Document</button>
-  </div>
+            <!-- Generate Button with Loading Indicator -->
+            <button id="generateBtn" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 transition duration-200 ease-in-out flex items-center justify-center" disabled>
+                <!-- Loading spinner, hidden by default -->
+                <span id="loadingIndicator" class="hidden animate-spin h-5 w-5 mr-3 border-4 border-white border-t-transparent rounded-full"></span>
+                Generate Document
+            </button>
+        </div>
 
-  <div class="box">
-    <strong>AI Output:</strong>
-    <div id="output">Loading model...</div>
-  </div>
-</div>
-
-<script type="module">
-  import * as webllm from "https://raw.githubusercontent.com/mlc-ai/web-llm/main/dist/index.js";
-
-  let chat;
-
-  async function initLLM() {
-    document.getElementById("output").innerText = "⏳ Loading model (first time may take ~10s)...";
-
-    chat = await webllm.CreateChatModule({
-      model: "TinyLlama-1.1B-Chat-v0.3-q4f32_1-MLC",
-    });
-
-    document.getElementById("output").innerText = "✅ Model loaded! Ready to generate.";
-  }
-
-  document.getElementById("generate").addEventListener("click", async () => {
-    if (!chat) {
-      alert("Model still loading...");
-      return;
-    }
-
-    const docType = document.getElementById("type").value;
-    const input = document.getElementById("input").value;
-    const prompt = `Write a professional ${docType.toLowerCase()} based on this description: ${input}`;
-
-    document.getElementById("output").innerText = "🧠 Generating document...";
-
-    const reply = await chat.chat(prompt);
-    document.getElementById("output").innerText = reply;
-  });
-
-  initLLM();
-</script>
-
+        <!-- Right Box: Generated Output Display -->
+        <div class="flex-1 p-6 flex flex-col bg-gray-50">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Generated Document</h2>
+            <div id="output" class="flex-1 p-4 bg-white border border-gray-300 rounded-lg overflow-y-auto text-gray-800 leading-relaxed text-sm shadow-inner">
+                <p class="text-gray-600">WebLLM is initializing... Please wait for the model to load.</p>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
